@@ -1,0 +1,170 @@
+const express = require('express');
+const cors = require('cors');
+const { Gateway, Wallets } = require('fabric-network');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const ccName = 'booktrace';
+const channelName = 'book-trace-channel';
+const walletPath = path.join(__dirname, 'wallet');
+
+// 连接配置
+const connectionProfile = {
+    name: 'book-trace-network',
+    version: '1.0.0',
+    clients: {
+        org1: {
+            mspid: 'Org1MSP',
+            peers: ['peer0.org1.example.com'],
+            orderers: ['orderer.example.com']
+        }
+    },
+    channels: {
+        'book-trace-channel': {
+            peers: {
+                'peer0.org1.example.com': {},
+                'peer0.org2.example.com': {}
+            }
+        }
+    },
+    organizations: {
+        Org1MSP: {
+            mspid: 'Org1MSP',
+            peers: ['peer0.org1.example.com'],
+            certificateAuthorities: ['ca.org1.example.com']
+        }
+    },
+    peers: {
+        'peer0.org1.example.com': {
+            url: 'grpcs://localhost:7051',
+            tlsCACerts: { path: '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem' }
+        },
+        'peer0.org2.example.com': {
+            url: 'grpcs://localhost:9051',
+            tlsCACerts: { path: '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/tlsca/tlsca.org2.example.com-cert.pem' }
+        }
+    },
+    orderers: {
+        'orderer.example.com': {
+            url: 'grpcs://localhost:7050',
+            tlsCACerts: { path: '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/test-network/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem' }
+        }
+    }
+};
+
+async function getGateway() {
+    if (!fs.existsSync(walletPath)) {
+        fs.mkdirSync(walletPath, { recursive: true });
+        
+        const wallet = await Wallets.newFileSystemWallet(walletPath);
+        const certPath = '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/cert.pem';
+        const keyPath = '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/priv_sk';
+        
+        if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+            const certificate = fs.readFileSync(certPath).toString();
+            const privateKey = fs.readFileSync(keyPath).toString();
+            
+            await wallet.put('Admin@org1.example.com', {
+                credentials: { certificate, privateKey },
+                mspId: 'Org1MSP',
+                type: 'X.509'
+            });
+            console.log('管理员身份已导入钱包');
+        } else {
+            console.error(' 证书文件不存在');
+            process.exit(1);
+        }
+    }
+    
+    const wallet = await Wallets.newFileSystemWallet(walletPath);
+    const gateway = new Gateway();
+    await gateway.connect(connectionProfile, {
+        wallet,
+        identity: 'Admin@org1.example.com',
+        discovery: { enabled: false }
+    });
+    return gateway;
+}
+
+// API 路由
+app.post('/api/books', async (req, res) => {
+    try {
+        const { isbn, bookName, author, publisher, publishDate, category, price } = req.body;
+        const gateway = await getGateway();
+        const network = await gateway.getNetwork(channelName);
+        const contract = network.getContract(ccName);
+        await contract.submitTransaction('CreateBook', isbn, bookName, author, publisher, publishDate, category, price);
+        await gateway.disconnect();
+        res.json({ success: true, message: '图书创建成功' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/books/:isbn', async (req, res) => {
+    try {
+        const { isbn } = req.params;
+        const gateway = await getGateway();
+        const network = await gateway.getNetwork(channelName);
+        const contract = network.getContract(ccName);
+        const result = await contract.evaluateTransaction('QueryBookByISBN', isbn);
+        await gateway.disconnect();
+        res.json(JSON.parse(result.toString()));
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/books', async (req, res) => {
+    try {
+        const gateway = await getGateway();
+        const network = await gateway.getNetwork(channelName);
+        const contract = network.getContract(ccName);
+        const result = await contract.evaluateTransaction('QueryAllBooks');
+        await gateway.disconnect();
+        res.json(JSON.parse(result.toString()));
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.put('/api/books/:isbn/state', async (req, res) => {
+    try {
+        const { isbn } = req.params;
+        const { newState, orgName, remark } = req.body;
+        const gateway = await getGateway();
+        const network = await gateway.getNetwork(channelName);
+        const contract = network.getContract(ccName);
+        await contract.submitTransaction('UpdateBookState', isbn, newState, orgName, remark);
+        await gateway.disconnect();
+        res.json({ success: true, message: '状态更新成功' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/statistics', async (req, res) => {
+    try {
+        const gateway = await getGateway();
+        const network = await gateway.getNetwork(channelName);
+        const contract = network.getContract(ccName);
+        const result = await contract.evaluateTransaction('GetStatistics');
+        await gateway.disconnect();
+        res.json(JSON.parse(result.toString()));
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(` 后端服务运行在 http://localhost:${PORT}`);
+});

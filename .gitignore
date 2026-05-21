@@ -1,0 +1,8 @@
+*.exe
+*.tar.gz
+organizations/**/msp/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+chaincode/booktrace/go/vendor/
