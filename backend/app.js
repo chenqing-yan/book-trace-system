@@ -11,10 +11,8 @@ app.use(express.json());
 
 const SECRET_KEY = 'book-trace-secret-key-2025';
 
-// 颜色定义（终端彩色输出）
 const colors = {
     reset: '\x1b[0m',
-    bright: '\x1b[1m',
     red: '\x1b[31m',
     green: '\x1b[32m',
     yellow: '\x1b[33m',
@@ -53,22 +51,42 @@ const peer0CA = '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/t
 const peer1CA = '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt';
 const baseDir = '/home/hongyingying3232705141/HyperledgerFabric/fabric-samples/test-network';
 
+function buildCtorArgs(func, args) {
+    const allArgs = [func, ...args.map(a => String(a))];
+    return JSON.stringify({ Args: allArgs });
+}
+
 async function queryChaincode(func, args) {
     log(colors.cyan, 'QUERY', `查询链码: ${func}`);
-    const command = `cd ${baseDir} && peer chaincode query -C book-trace-channel -n booktrace -c '{"Args":["${func}","${args.join('","')}"]}' --tls --cafile ${ordererCA}`;
-    const { stdout } = await execPromise(command, { env: fabricEnv });
-    let result = stdout.trim();
-    if (result.includes('Query result: ')) result = result.split('Query result: ')[1];
-    return JSON.parse(result);
+    const ctorArgs = buildCtorArgs(func, args);
+    const command = `cd ${baseDir} && peer chaincode query -C book-trace-channel -n booktrace -c '${ctorArgs}' --tls --cafile ${ordererCA}`;
+    
+    try {
+        const { stdout } = await execPromise(command, { env: fabricEnv });
+        let result = stdout.trim();
+        if (result.includes('Query result: ')) result = result.split('Query result: ')[1];
+        return JSON.parse(result);
+    } catch (error) {
+        log(colors.red, 'QUERY_ERROR', error.message);
+        throw error;
+    }
 }
 
 async function invokeChaincode(func, args) {
     log(colors.magenta, 'INVOKE', `调用链码: ${func}`);
     log(colors.magenta, 'INVOKE', `参数: ${JSON.stringify(args)}`);
-    const command = `cd ${baseDir} && peer chaincode invoke -C book-trace-channel -n booktrace -c '{"Args":["${func}","${args.join('","')}"]}' --tls --cafile ${ordererCA} --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles ${peer0CA} --peerAddresses peer0.org2.example.com:9051 --tlsRootCertFiles ${peer1CA} --waitForEvent`;
-    const { stdout } = await execPromise(command, { env: fabricEnv });
-    log(colors.green, 'INVOKE', `成功: ${func}`);
-    return stdout;
+    
+    const ctorArgs = buildCtorArgs(func, args);
+    const command = `cd ${baseDir} && peer chaincode invoke -C book-trace-channel -n booktrace -c '${ctorArgs}' --tls --cafile ${ordererCA} --peerAddresses peer0.org1.example.com:7051 --tlsRootCertFiles ${peer0CA} --peerAddresses peer0.org2.example.com:9051 --tlsRootCertFiles ${peer1CA} --waitForEvent`;
+    
+    try {
+        const { stdout } = await execPromise(command, { env: fabricEnv });
+        log(colors.green, 'INVOKE', `成功: ${func}`);
+        return stdout;
+    } catch (error) {
+        log(colors.red, 'INVOKE_ERROR', error.message);
+        throw error;
+    }
 }
 
 function checkRole(allowedRoles) {
@@ -83,6 +101,28 @@ function checkRole(allowedRoles) {
         } catch (error) {
             res.status(401).json({ error: '登录已过期' });
         }
+    };
+}
+
+// ==================== 辅助函数：格式化图书数据 ====================
+function formatCarbonFootprint(carbonData) {
+    if (!carbonData) return null;
+    const result = { totalEmissions: carbonData.totalEmissions || 0 };
+    
+    // 只有大于0的才显示
+    if (carbonData.printEmissions && carbonData.printEmissions > 0) {
+        result.printEmissions = carbonData.printEmissions;
+    }
+    if (carbonData.transportEmissions && carbonData.transportEmissions > 0) {
+        result.transportEmissions = carbonData.transportEmissions;
+    }
+    return result;
+}
+
+function formatBook(book) {
+    return {
+        ...book,
+        carbonFootprint: formatCarbonFootprint(book.carbonFootprint)
     };
 }
 
@@ -120,7 +160,9 @@ app.get('/api/books', checkRole(['publisher', 'printer', 'wholesaler', 'bookstor
     log(colors.cyan, 'QUERY', `用户 ${req.user.name} 查询图书列表`);
     try {
         const books = await queryChaincode('QueryAllBooks', []);
-        res.json(books);
+        // 格式化所有图书的碳足迹数据
+        const formattedBooks = Array.isArray(books) ? books.map(formatBook) : books;
+        res.json(formattedBooks);
     } catch (error) {
         log(colors.red, 'ERROR', error.message);
         res.status(500).json({ error: error.message });
@@ -132,35 +174,55 @@ app.get('/api/books/:isbn', checkRole(['publisher', 'printer', 'wholesaler', 'bo
     try {
         const { isbn } = req.params;
         const book = await queryChaincode('QueryBookByISBN', [isbn]);
-        res.json(book);
+        res.json(formatBook(book));
     } catch (error) {
         log(colors.red, 'ERROR', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/api/books', checkRole(['publisher']), async (req, res) => {
-    const { isbn, bookName, author, publisher, publishDate, category, price, quantity } = req.body;
-    log(colors.yellow, 'CREATE', `用户 ${req.user.name} 创建图书: ${isbn} - ${bookName}, 数量: ${quantity || 1}`);
+// 批量创建图书
+app.post('/api/books/batch', checkRole(['publisher']), async (req, res) => {
+    const { batchId, books, paperType, printEnergy, bookWeight } = req.body;
+    const actualBatchId = batchId || `BATCH_${Date.now()}`;
+    log(colors.yellow, 'CREATE', `批量创建图书: ${actualBatchId}, 数量: ${books.length}`);
+    
     try {
-        await invokeChaincode('CreateBook', [
-            isbn, bookName, author, publisher, publishDate, category, price.toString(), 
-            (quantity || 1).toString(), `batch_${Date.now()}`, '普通纸', '100', '0.5'
+        const booksJson = JSON.stringify({ books: books });
+        
+        await invokeChaincode('BatchCreateBooks', [
+            actualBatchId,
+            booksJson,
+            paperType || '普通纸',
+            (printEnergy || 100).toString(),
+            (bookWeight || 0.5).toString()
         ]);
-        log(colors.green, 'CREATE', `成功: ${isbn}`);
-        res.json({ success: true, message: '图书创建成功' });
+        
+        log(colors.green, 'CREATE', `批量创建成功: ${actualBatchId}`);
+        res.json({ success: true, message: `批次 ${actualBatchId} 创建成功，共 ${books.length} 本` });
     } catch (error) {
         log(colors.red, 'ERROR', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
+// 更新图书状态（支持数量参数，解决多次上架问题）
 app.put('/api/books/:isbn/state', checkRole(['publisher', 'printer', 'wholesaler', 'bookstore']), async (req, res) => {
     const { isbn } = req.params;
-    const { newState, remark } = req.body;
-    log(colors.yellow, 'UPDATE', `用户 ${req.user.name} 更新图书状态: ${isbn} -> ${newState}`);
+    const { newState, remark, quantity } = req.body;
+    log(colors.yellow, 'UPDATE', `用户 ${req.user.name} 更新图书状态: ${isbn} -> ${newState}${quantity ? ', 数量: ' + quantity : ''}`);
     try {
-        await invokeChaincode('UpdateBookState', [isbn, newState, req.user.roleName, remark || '', `batch_${Date.now()}`, '0', '公路']);
+        // 传递数量参数给链码
+        await invokeChaincode('UpdateBookState', [
+            isbn, 
+            newState, 
+            req.user.roleName, 
+            remark || '', 
+            `batch_${Date.now()}`, 
+            '0', 
+            '公路',
+            (quantity || 0).toString()  // 新增数量参数
+        ]);
         log(colors.green, 'UPDATE', `成功: ${isbn} -> ${newState}`);
         res.json({ success: true, message: '状态更新成功' });
     } catch (error) {
@@ -189,11 +251,25 @@ app.post('/api/books/:isbn/buy', checkRole(['user']), async (req, res) => {
     log(colors.yellow, 'BUY', `用户 ${req.user.name} 购买: ${isbn} x ${buyCount}`);
     try {
         const book = await queryChaincode('QueryBookByISBN', [isbn]);
-        if (book.currentState !== '书店上架') return res.status(400).json({ error: '该书当前不可购买' });
-        if (book.quantity < buyCount) return res.status(400).json({ error: `库存不足，当前库存: ${book.quantity}` });
+        if (book.currentState !== '书店上架') {
+            return res.status(400).json({ error: '该书当前不可购买' });
+        }
+        if (book.quantity < buyCount) {
+            return res.status(400).json({ error: `库存不足，当前库存: ${book.quantity}` });
+        }
+        
         await invokeChaincode('BuyBook', [isbn, req.user.id.toString(), req.user.name, buyCount.toString()]);
+        
         for (let i = 0; i < buyCount; i++) {
-            purchaseRecords.push({ id: Date.now() + i, isbn: book.isbn, bookName: book.bookName, buyer: req.user.name, buyTime: new Date().toISOString(), price: book.price });
+            purchaseRecords.push({
+                id: Date.now() + i,
+                isbn: book.isbn,
+                bookName: book.bookName,
+                buyer: req.user.name,
+                buyTime: new Date().toISOString(),
+                price: book.price,
+                status: 'owned'
+            });
         }
         log(colors.green, 'BUY', `成功: ${isbn} x ${buyCount}`);
         res.json({ success: true, message: `购买成功！共 ${buyCount} 本` });
@@ -204,8 +280,99 @@ app.post('/api/books/:isbn/buy', checkRole(['user']), async (req, res) => {
 });
 
 app.get('/api/my-purchases', checkRole(['user']), async (req, res) => {
-    log(colors.cyan, 'QUERY', `用户 ${req.user.name} 查询购买记录`);
-    res.json(purchaseRecords.filter(p => p.buyer === req.user.name));
+    log(colors.cyan, 'QUERY', `用户 ${req.user.name} 查询我的书架`);
+    const myBooks = purchaseRecords.filter(p => p.buyer === req.user.name && p.status === 'owned');
+    res.json(myBooks);
+});
+
+// 用户转售二手书（不修改链上图书状态，只创建二手书列表）
+app.post('/api/secondhand/list', checkRole(['user']), async (req, res) => {
+    const { isbn, price, condition } = req.body;
+    log(colors.yellow, 'SECONDHAND', `用户 ${req.user.name} 上架二手书: ${isbn}, 价格: ¥${price}`);
+    try {
+        const ownedIndex = purchaseRecords.findIndex(p => p.buyer === req.user.name && p.isbn === isbn && p.status === 'owned');
+        if (ownedIndex === -1) {
+            return res.status(403).json({ error: '您没有这本书或已经转售过了' });
+        }
+        
+        // 先标记本地记录
+        purchaseRecords[ownedIndex].status = 'listing';
+        purchaseRecords[ownedIndex].listingTime = new Date().toISOString();
+        purchaseRecords[ownedIndex].listingPrice = price;
+        
+        // 调用链码创建二手书列表
+        const result = await invokeChaincode('ListSecondHandBook', [
+            isbn, 
+            req.user.id.toString(), 
+            req.user.name, 
+            price.toString(), 
+            condition || '九成新'
+        ]);
+        
+        log(colors.green, 'SECONDHAND', `成功: ${isbn}`);
+        res.json({ success: true, message: '上架成功', listingId: result });
+    } catch (error) {
+        // 失败时恢复状态
+        if (ownedIndex !== -1) {
+            purchaseRecords[ownedIndex].status = 'owned';
+            delete purchaseRecords[ownedIndex].listingTime;
+            delete purchaseRecords[ownedIndex].listingPrice;
+        }
+        log(colors.red, 'ERROR', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/secondhand/listings', checkRole(['user', 'bookstore']), async (req, res) => {
+    log(colors.cyan, 'QUERY', `用户 ${req.user.name} 查询二手书列表`);
+    try {
+        const listings = await queryChaincode('GetSecondHandListings', []);
+        res.json(listings);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/secondhand/buy', checkRole(['user']), async (req, res) => {
+    const { listingId, isbn } = req.body;
+    log(colors.yellow, 'SECONDHAND', `用户 ${req.user.name} 购买二手书: ${isbn}`);
+    try {
+        const listings = await queryChaincode('GetSecondHandListings', []);
+        const targetListing = listings.find(l => l.id === listingId && l.isbn === isbn);
+        if (!targetListing) {
+            return res.status(404).json({ error: '二手书不存在或已售出' });
+        }
+        
+        await invokeChaincode('BuySecondHandBook', [isbn, listingId, req.user.id.toString(), req.user.name]);
+        
+        // 更新本地转售记录
+        const sellerRecord = purchaseRecords.findIndex(p => 
+            p.buyer === targetListing.sellerName && 
+            p.isbn === isbn && 
+            p.status === 'listing'
+        );
+        if (sellerRecord !== -1) {
+            purchaseRecords[sellerRecord].status = 'sold';
+            purchaseRecords[sellerRecord].soldTime = new Date().toISOString();
+            purchaseRecords[sellerRecord].soldPrice = targetListing.price;
+        }
+        
+        purchaseRecords.push({
+            id: Date.now(),
+            isbn: isbn,
+            bookName: targetListing.bookName,
+            buyer: req.user.name,
+            buyTime: new Date().toISOString(),
+            price: targetListing.price,
+            status: 'owned',
+            isSecondHand: true
+        });
+        log(colors.green, 'SECONDHAND', `成功: ${isbn}`);
+        res.json({ success: true, message: '二手书购买成功' });
+    } catch (error) {
+        log(colors.red, 'ERROR', error.message);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/api/books/:isbn/review', checkRole(['user']), async (req, res) => {
@@ -213,9 +380,11 @@ app.post('/api/books/:isbn/review', checkRole(['user']), async (req, res) => {
     const { rating, reviewType, content } = req.body;
     log(colors.yellow, 'REVIEW', `用户 ${req.user.name} 评价图书: ${isbn}, 类型: ${reviewType}`);
     try {
-        const hasBought = purchaseRecords.some(p => p.buyer === req.user.name && p.isbn === isbn);
-        if (!hasBought) return res.status(403).json({ error: '只有购买过该书的用户才能评价' });
-        await invokeChaincode('AddReview', [isbn, req.user.id.toString(), req.user.name, rating.toString(), reviewType, content, hasBought ? 'true' : 'false']);
+        const hasBought = purchaseRecords.some(p => p.buyer === req.user.name && p.isbn === isbn && (p.status === 'owned' || p.status === 'sold'));
+        if (!hasBought) {
+            return res.status(403).json({ error: '只有购买过该书的用户才能评价' });
+        }
+        await invokeChaincode('AddReview', [isbn, req.user.id.toString(), req.user.name, rating.toString(), reviewType, content, 'true']);
         log(colors.green, 'REVIEW', `成功: ${isbn}`);
         res.json({ success: true, message: '评价成功' });
     } catch (error) {
@@ -234,65 +403,11 @@ app.get('/api/books/:isbn/review-stats', checkRole(['publisher', 'printer', 'who
     }
 });
 
-app.post('/api/secondhand/list', checkRole(['user']), async (req, res) => {
-    const { isbn, price, condition } = req.body;
-    log(colors.yellow, 'SECONDHAND', `用户 ${req.user.name} 上架二手书: ${isbn}, 价格: ¥${price}`);
-    try {
-        const hasBought = purchaseRecords.some(p => p.buyer === req.user.name && p.isbn === isbn);
-        if (!hasBought) return res.status(403).json({ error: '只有购买过该书的用户才能转售' });
-        const result = await invokeChaincode('ListSecondHandBook', [isbn, req.user.id.toString(), req.user.name, price.toString(), condition || '九成新']);
-        log(colors.green, 'SECONDHAND', `成功: ${isbn}`);
-        res.json({ success: true, message: '上架成功', listingId: result });
-    } catch (error) {
-        log(colors.red, 'ERROR', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/secondhand/listings', checkRole(['user', 'bookstore']), async (req, res) => {
-    log(colors.cyan, 'QUERY', `用户 ${req.user.name} 查询二手书列表`);
-    try {
-        const listings = await queryChaincode('GetSecondHandListings', []);
-        res.json(listings);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/secondhand/buy', checkRole(['user']), async (req, res) => {
-    const { listingId, isbn } = req.body;
-    log(colors.yellow, 'SECONDHAND', `用户 ${req.user.name} 购买二手书: ${isbn}, 挂牌ID: ${listingId}`);
-    try {
-        await invokeChaincode('BuySecondHandBook', [isbn, listingId, req.user.id.toString(), req.user.name]);
-        log(colors.green, 'SECONDHAND', `成功: ${isbn}`);
-        res.json({ success: true, message: '二手书购买成功' });
-    } catch (error) {
-        log(colors.red, 'ERROR', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
-
 app.get('/api/statistics', checkRole(['regulator']), async (req, res) => {
     log(colors.cyan, 'QUERY', `用户 ${req.user.name} 查询统计数据`);
     try {
         const stats = await queryChaincode('GetStatistics', []);
         res.json(stats);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/carbon-stats', checkRole(['regulator', 'publisher']), async (req, res) => {
-    log(colors.cyan, 'QUERY', `用户 ${req.user.name} 查询碳足迹统计`);
-    try {
-        const books = await queryChaincode('QueryAllBooks', []);
-        let totalPrint = 0, totalTransport = 0, totalEmission = 0;
-        for (const book of books) {
-            totalPrint += book.carbonFootprint?.printEmissions || 0;
-            totalTransport += book.carbonFootprint?.transportEmissions || 0;
-            totalEmission += book.carbonFootprint?.totalEmissions || 0;
-        }
-        res.json({ totalPrintEmissions: totalPrint, totalTransportEmissions: totalTransport, totalEmissions: totalEmission, bookCount: books.length });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

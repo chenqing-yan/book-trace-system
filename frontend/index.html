@@ -54,209 +54,230 @@
     </style>
 </head>
 <body>
-    <div id="loginPage" class="login-container">
-        <div class="login-card">
-            <h2>📚 链上图书全生命周期管理系统</h2>
-            <select id="roleSelect" onchange="updateUsername()">
-                <option value="publisher">出版社</option>
-                <option value="printer">印刷厂</option>
-                <option value="wholesaler">批发商</option>
-                <option value="bookstore">书店</option>
-                <option value="regulator">监管机构</option>
-                <option value="user">普通用户</option>
-            </select>
-            <input type="text" id="username" placeholder="用户名">
-            <input type="password" id="password" placeholder="密码" value="123">
-            <button onclick="login()">登录</button>
-            <div id="loginError" class="error"></div>
-            <div style="text-align:center; margin-top:15px;"><a href="#" onclick="showRegister()" style="color:#3498db;">还没有账号？立即注册</a></div>
-            <div style="margin-top: 20px; font-size: 12px; color: #999; text-align: center;">测试账号: 密码123</div>
-        </div>
+<div id="loginPage" class="login-container">
+    <div class="login-card">
+        <h2>📚 链上图书全生命周期管理系统</h2>
+        <select id="roleSelect" onchange="updateUsername()">
+            <option value="publisher">出版社</option>
+            <option value="printer">印刷厂</option>
+            <option value="wholesaler">批发商</option>
+            <option value="bookstore">书店</option>
+            <option value="regulator">监管机构</option>
+            <option value="user">普通用户</option>
+        </select>
+        <input type="text" id="username" placeholder="用户名">
+        <input type="password" id="password" placeholder="密码" value="123">
+        <button onclick="login()">登录</button>
+        <div id="loginError" class="error"></div>
+        <div style="text-align:center; margin-top:15px;"><a href="#" onclick="showRegister()" style="color:#3498db;">还没有账号？立即注册</a></div>
+        <div style="margin-top: 20px; font-size: 12px; color: #999; text-align: center;">测试账号: 密码123</div>
     </div>
+</div>
 
-    <div id="app" class="app-container">
-        <header>
-            <div class="header-content">
-                <h1>📚 链上图书全生命周期管理系统</h1>
-                <div class="user-info">
-                    <span id="userName"></span>
-                    <span class="role-badge" id="userRole"></span>
-                    <button class="logout-btn" onclick="logout()">退出</button>
-                </div>
+<div id="app" class="app-container">
+    <header>
+        <div class="header-content">
+            <h1>📚 链上图书全生命周期管理系统</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <span class="role-badge" id="userRole"></span>
+                <button class="logout-btn" onclick="logout()">退出</button>
             </div>
-            <p style="margin-top: 10px; opacity: 0.8;">基于 Hyperledger Fabric 区块链</p>
-        </header>
-        <div class="container" id="dynamicContent"></div>
-    </div>
-
-    <div id="registerModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeRegisterModal()">&times;</span>
-            <h3>注册新账号</h3>
-            <input type="text" id="regUsername" placeholder="用户名" style="width:100%; margin:10px 0; padding:10px;">
-            <input type="password" id="regPassword" placeholder="密码" style="width:100%; margin:10px 0; padding:10px;">
-            <select id="regRole" style="width:100%; margin:10px 0; padding:10px;">
-                <option value="user">普通用户</option>
-                <option value="publisher">出版社</option>
-                <option value="printer">印刷厂</option>
-                <option value="wholesaler">批发商</option>
-                <option value="bookstore">书店</option>
-                <option value="regulator">监管机构</option>
-            </select>
-            <button onclick="register()" style="width:100%; padding:10px; background:#27ae60;">注册</button>
         </div>
+        <p style="margin-top: 10px; opacity: 0.8;">基于 Hyperledger Fabric 区块链 | 防伪码+碳足迹 | 全程可追溯</p>
+    </header>
+    <div class="container" id="dynamicContent"></div>
+</div>
+
+<div id="registerModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeRegisterModal()">&times;</span>
+        <h3>注册新账号</h3>
+        <input type="text" id="regUsername" placeholder="用户名" style="width:100%; margin:10px 0; padding:10px;">
+        <input type="password" id="regPassword" placeholder="密码" style="width:100%; margin:10px 0; padding:10px;">
+        <select id="regRole" style="width:100%; margin:10px 0; padding:10px;">
+            <option value="user">普通用户</option>
+            <option value="publisher">出版社</option>
+            <option value="printer">印刷厂</option>
+            <option value="wholesaler">批发商</option>
+            <option value="bookstore">书店</option>
+            <option value="regulator">监管机构</option>
+        </select>
+        <button onclick="register()" style="width:100%; padding:10px; background:#27ae60;">注册</button>
     </div>
+</div>
 
-    <div id="qrModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeQRModal()">&times;</span>
-            <h3 id="qrBookName"></h3>
-            <div id="qrCode"></div>
-            <p>扫码查看溯源</p>
-        </div>
+<div id="qrModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeQRModal()">&times;</span>
+        <h3 id="qrBookName"></h3>
+        <div id="qrCode"></div>
+        <p>扫码查看溯源</p>
     </div>
+</div>
 
-    <script>
-        const API_BASE = 'http://192.168.75.134:3000/api';
-        let currentPage = 1, pageSize = 8, searchKeyword = '', searchStatus = '';
-        let coverImages = JSON.parse(localStorage.getItem('book_covers') || '{}');
-        let allBooksCache = [];
-        
-        function saveCover(isbn, data) { coverImages[isbn] = data; localStorage.setItem('book_covers', JSON.stringify(coverImages)); }
-        function getCover(isbn) { return coverImages[isbn] || null; }
-        function updateUsername() { document.getElementById('username').value = document.getElementById('roleSelect').value; }
+<script>
+    const API_BASE = 'http://192.168.75.134:3000/api';
+    let currentPage = 1, pageSize = 8, searchKeyword = '', searchStatus = '';
+    let coverImages = JSON.parse(localStorage.getItem('book_covers') || '{}');
+    let allBooksCache = [];
+    
+    function saveCover(isbn, data) { coverImages[isbn] = data; localStorage.setItem('book_covers', JSON.stringify(coverImages)); }
+    function getCover(isbn) { return coverImages[isbn] || null; }
+    function updateUsername() { document.getElementById('username').value = document.getElementById('roleSelect').value; }
 
-        async function login() {
-            const username = document.getElementById('username').value, password = document.getElementById('password').value;
-            if (!username) { document.getElementById('loginError').innerText = '请输入用户名'; return; }
-            try {
-                const res = await fetch(`${API_BASE}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-                const data = await res.json();
-                if (data.success) {
-                    localStorage.setItem('token', data.token); localStorage.setItem('user', JSON.stringify(data.user));
-                    document.getElementById('loginPage').style.display = 'none'; document.getElementById('app').style.display = 'block';
-                    const user = JSON.parse(localStorage.getItem('user'));
-                    document.getElementById('userName').innerText = user.name; document.getElementById('userRole').innerText = user.roleName;
-                    loadRoleContent();
-                } else { document.getElementById('loginError').innerText = data.error; }
-            } catch (err) { document.getElementById('loginError').innerText = '连接失败'; }
-        }
-
-        function logout() { localStorage.clear(); location.reload(); }
-        function getToken() { return localStorage.getItem('token'); }
-        function showRegister() { document.getElementById('registerModal').style.display = 'block'; }
-        function closeRegisterModal() { document.getElementById('registerModal').style.display = 'none'; }
-        function showQRCode(isbn, name) { document.getElementById('qrBookName').innerText = name; document.getElementById('qrCode').innerHTML = ''; new QRCode(document.getElementById('qrCode'), { text: `${window.location.origin}?isbn=${isbn}`, width: 180, height: 180 }); document.getElementById('qrModal').style.display = 'block'; }
-        function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
-
-        async function register() {
-            const username = document.getElementById('regUsername').value, password = document.getElementById('regPassword').value, role = document.getElementById('regRole').value;
-            if (!username || !password) { alert('请填写用户名和密码'); return; }
-            const res = await fetch(`${API_BASE}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, role }) });
+    async function login() {
+        const username = document.getElementById('username').value, password = document.getElementById('password').value;
+        if (!username) { document.getElementById('loginError').innerText = '请输入用户名'; return; }
+        try {
+            const res = await fetch(`${API_BASE}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
             const data = await res.json();
-            if (data.success) { alert('注册成功！请登录'); closeRegisterModal(); } else { alert('注册失败: ' + data.error); }
+            if (data.success) {
+                localStorage.setItem('token', data.token); localStorage.setItem('user', JSON.stringify(data.user));
+                document.getElementById('loginPage').style.display = 'none'; document.getElementById('app').style.display = 'block';
+                const user = JSON.parse(localStorage.getItem('user'));
+                document.getElementById('userName').innerText = user.name; document.getElementById('userRole').innerText = user.roleName;
+                loadRoleContent();
+            } else { document.getElementById('loginError').innerText = data.error; }
+        } catch (err) { document.getElementById('loginError').innerText = '连接失败'; }
+    }
+
+    function logout() { localStorage.clear(); location.reload(); }
+    function getToken() { return localStorage.getItem('token'); }
+    function showRegister() { document.getElementById('registerModal').style.display = 'block'; }
+    function closeRegisterModal() { document.getElementById('registerModal').style.display = 'none'; }
+    function showQRCode(isbn, name) { document.getElementById('qrBookName').innerText = name; document.getElementById('qrCode').innerHTML = ''; new QRCode(document.getElementById('qrCode'), { text: `${window.location.origin}?isbn=${isbn}`, width: 180, height: 180 }); document.getElementById('qrModal').style.display = 'block'; }
+    function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
+
+    async function register() {
+        const username = document.getElementById('regUsername').value, password = document.getElementById('regPassword').value, role = document.getElementById('regRole').value;
+        if (!username || !password) { alert('请填写用户名和密码'); return; }
+        const res = await fetch(`${API_BASE}/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, role }) });
+        const data = await res.json();
+        if (data.success) { alert('注册成功！请登录'); closeRegisterModal(); } else { alert('注册失败: ' + data.error); }
+    }
+
+    async function fetchBooks() { const res = await fetch(`${API_BASE}/books`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); if (!res.ok) throw new Error('获取失败'); return res.json(); }
+    async function fetchStats() { const res = await fetch(`${API_BASE}/statistics`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); return res.json(); }
+    async function fetchMyPurchases() { const res = await fetch(`${API_BASE}/my-purchases`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); return res.json(); }
+    async function fetchSecondHandListings() { const res = await fetch(`${API_BASE}/secondhand/listings`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); return res.json(); }
+
+    function applyFilter() { searchKeyword = document.getElementById('searchKeyword')?.value.toLowerCase() || ''; searchStatus = document.getElementById('searchStatus')?.value || ''; currentPage = 1; loadRoleContent(); }
+    function resetFilter() { searchKeyword = ''; searchStatus = ''; if(document.getElementById('searchKeyword')) document.getElementById('searchKeyword').value = ''; if(document.getElementById('searchStatus')) document.getElementById('searchStatus').value = ''; currentPage = 1; loadRoleContent(); }
+    function filterBooks(books) { let filtered = [...books]; if (searchKeyword) filtered = filtered.filter(b => (b.bookName || '').toLowerCase().includes(searchKeyword) || (b.author || '').toLowerCase().includes(searchKeyword) || (b.isbn || '').toLowerCase().includes(searchKeyword)); if (searchStatus) filtered = filtered.filter(b => b.currentState === searchStatus); return filtered; }
+    function changePage(delta) { const totalPages = Math.ceil(allBooksCache.length / pageSize); const newPage = currentPage + delta; if (newPage >= 1 && newPage <= totalPages) { currentPage = newPage; loadRoleContent(); } }
+
+    async function createBook() {
+        const isbn = document.getElementById('isbn')?.value, bookName = document.getElementById('bookName')?.value, author = document.getElementById('author')?.value, publisher = document.getElementById('publisher')?.value, publishDate = document.getElementById('publishDate')?.value, category = document.getElementById('category')?.value, price = document.getElementById('price')?.value, quantity = document.getElementById('quantity')?.value, paperType = document.getElementById('paperType')?.value, printEnergy = document.getElementById('printEnergy')?.value, coverFile = document.getElementById('coverFile')?.files[0];
+        if (!isbn || !bookName) { alert('请填写ISBN和书名'); return; }
+        const bookData = { isbn, bookName, author, publisher, publishDate, category, price: parseFloat(price), quantity: parseInt(quantity) || 1 };
+        const batchData = { batchId: `BATCH_${Date.now()}`, books: [bookData], paperType: paperType || '普通纸', printEnergy: parseInt(printEnergy) || 100, bookWeight: 0.5 };
+        if (coverFile) { const reader = new FileReader(); reader.onload = function(e) { saveCover(isbn, e.target.result); submitBook(batchData); }; reader.readAsDataURL(coverFile); } else { submitBook(batchData); }
+    }
+    async function submitBook(batchData) { const res = await fetch(`${API_BASE}/books/batch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify(batchData) }); const result = await res.json(); alert(result.success ? '✅ 创建成功' : '❌ 失败: ' + result.error); if (result.success) loadRoleContent(); }
+
+    async function updateState(isbn, newState, remark) { const res = await fetch(`${API_BASE}/books/${isbn}/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ newState, remark }) }); const result = await res.json(); alert(result.success ? '✅ 状态更新成功' : '❌ 更新失败: ' + result.error); if (result.success) loadRoleContent(); }
+    async function finishPrint(isbn) { await updateState(isbn, '印刷完成', '印刷厂完成印刷'); await updateState(isbn, '出厂分发', '印刷厂出厂分发'); }
+    async function warehouseAndDistribute(isbn) { await updateState(isbn, '批发商入库', '批发商确认入库'); await updateState(isbn, '配送到门店', '批发商配送到门店'); }
+    async function shelfBook(isbn) { await updateState(isbn, '书店上架', '书店确认上架'); }
+    async function shelfBookWithCount(isbn, count) { const res = await fetch(`${API_BASE}/books/${isbn}/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ newState: '书店上架', remark: `书店上架 ${count} 本`, quantity: parseInt(count) }) }); const result = await res.json(); alert(result.success ? '✅ 上架成功' : '❌ 上架失败: ' + result.error); if (result.success) loadRoleContent(); }
+    async function sellBook(isbn) { await updateState(isbn, '已售出', '书店售出'); }
+    async function buyBook(isbn, count) { const res = await fetch(`${API_BASE}/books/${isbn}/buy`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ count: count || 1 }) }); const result = await res.json(); alert(result.success ? `✅ 购买成功！${result.message}` : '❌ ' + result.error); if (result.success) loadRoleContent(); }
+    async function addReview(isbn, rating, reviewType, content) { const res = await fetch(`${API_BASE}/books/${isbn}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ rating, reviewType, content }) }); const result = await res.json(); alert(result.success ? '✅ 评价成功' : '❌ ' + result.error); if (result.success) loadRoleContent(); }
+    async function listSecondHand(isbn, price, condition) { const res = await fetch(`${API_BASE}/secondhand/list`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ isbn, price, condition }) }); const result = await res.json(); alert(result.success ? '✅ 上架成功' : '❌ ' + result.error); if (result.success) loadRoleContent(); }
+    async function buySecondHand(listingId, isbn) { const res = await fetch(`${API_BASE}/secondhand/buy`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ listingId, isbn }) }); const result = await res.json(); alert(result.success ? '✅ 二手书购买成功' : '❌ ' + result.error); if (result.success) loadRoleContent(); }
+    async function verifyAntiCounterfeit(isbn) { const res = await fetch(`${API_BASE}/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isbn, ip: "127.0.0.1", location: "未知", userAgent: navigator.userAgent }) }); const result = await res.json(); alert(result.message); return result; }
+
+    async function traceBook(isbn) {
+        const res = await fetch(`${API_BASE}/books/${isbn}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        const book = await res.json();
+        let commentsHtml = '';
+        if (book.comments && book.comments.length) { commentsHtml = `<div><h5>📝 读者评价 (${book.comments.length})</h5>${book.comments.map(c => `<div class="comment-item"><strong>${c.userName}</strong> <span class="rating">${c.type === 'good' ? '👍 好评' : '👎 差评'} ${'⭐'.repeat(c.rating)}</span><span class="comment-time">${c.time}</span><p>${c.content}</p></div>`).join('')}</div>`; }
+        // 修复：碳足迹只显示非零值
+        let carbonHtml = `<strong>🌍 碳足迹:</strong> ${book.carbonFootprint?.totalEmissions || 0} kg CO₂`;
+        if (book.carbonFootprint?.printEmissions) {
+            carbonHtml += ` (印刷: ${book.carbonFootprint.printEmissions} kg)`;
         }
-
-        async function fetchBooks() { const res = await fetch(`${API_BASE}/books`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); if (!res.ok) throw new Error('获取失败'); return res.json(); }
-        async function fetchStats() { const res = await fetch(`${API_BASE}/statistics`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); return res.json(); }
-        async function fetchMyPurchases() { const res = await fetch(`${API_BASE}/my-purchases`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); return res.json(); }
-        async function fetchSecondHandListings() { const res = await fetch(`${API_BASE}/secondhand/listings`, { headers: { 'Authorization': `Bearer ${getToken()}` } }); return res.json(); }
-
-        function applyFilter() { searchKeyword = document.getElementById('searchKeyword')?.value.toLowerCase() || ''; searchStatus = document.getElementById('searchStatus')?.value || ''; currentPage = 1; loadRoleContent(); }
-        function resetFilter() { searchKeyword = ''; searchStatus = ''; if(document.getElementById('searchKeyword')) document.getElementById('searchKeyword').value = ''; if(document.getElementById('searchStatus')) document.getElementById('searchStatus').value = ''; currentPage = 1; loadRoleContent(); }
-        function filterBooks(books) { let filtered = [...books]; if (searchKeyword) filtered = filtered.filter(b => (b.bookName || '').toLowerCase().includes(searchKeyword) || (b.author || '').toLowerCase().includes(searchKeyword) || (b.isbn || '').toLowerCase().includes(searchKeyword)); if (searchStatus) filtered = filtered.filter(b => b.currentState === searchStatus); return filtered; }
-        function changePage(delta) { const totalPages = Math.ceil(allBooksCache.length / pageSize); const newPage = currentPage + delta; if (newPage >= 1 && newPage <= totalPages) { currentPage = newPage; loadRoleContent(); } }
-
-        async function createBook() {
-            const isbn = document.getElementById('isbn')?.value, bookName = document.getElementById('bookName')?.value, author = document.getElementById('author')?.value, publisher = document.getElementById('publisher')?.value, publishDate = document.getElementById('publishDate')?.value, category = document.getElementById('category')?.value, price = document.getElementById('price')?.value, quantity = document.getElementById('quantity')?.value, coverFile = document.getElementById('coverFile')?.files[0];
-            if (!isbn || !bookName) { alert('请填写ISBN和书名'); return; }
-            const bookData = { isbn, bookName, author, publisher, publishDate, category, price: parseFloat(price), quantity: parseInt(quantity) || 1 };
-            if (coverFile) { const reader = new FileReader(); reader.onload = function(e) { saveCover(isbn, e.target.result); submitBook(bookData); }; reader.readAsDataURL(coverFile); } else { submitBook(bookData); }
+        if (book.carbonFootprint?.transportEmissions && book.carbonFootprint.transportEmissions > 0) {
+            carbonHtml += ` | 运输: ${book.carbonFootprint.transportEmissions} kg`;
         }
-        async function submitBook(bookData) { const res = await fetch(`${API_BASE}/books`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify(bookData) }); const result = await res.json(); alert(result.success ? '✅ 创建成功' : '❌ 失败: ' + result.error); if (result.success) loadRoleContent(); }
+        
+        let html = `<div class="trace-flow"><h4>📘 ${book.bookName}</h4><p><strong>ISBN:</strong> ${book.isbn} | <strong>作者:</strong> ${book.author} | <strong>出版社:</strong> ${book.publisher} | <strong>价格:</strong> ¥${book.price}</p><p><strong>库存:</strong> ${book.quantity || 0} 本 | <strong>已售:</strong> ${book.totalSold || 0} 本</p><p><strong>当前状态:</strong> <span class="state-badge">${book.currentState}</span></p><p><strong>🔐 防伪码:</strong> <span class="anti-code">${book.antiCounterfeit?.code || '未生成'}</span> <button class="btn-sm" onclick="verifyAntiCounterfeit('${book.isbn}')">验证真伪</button></p><p>${carbonHtml}</p><h5>📜 流转历史</h5>${book.flowHistory.map(flow => `<div class="flow-item"><strong>${flow.state}</strong> | ${flow.orgName} | ${flow.optTime}<br><small>${flow.remark}</small></div>`).join('')}${commentsHtml}<div class="comment-form"><h5>💬 发表评价</h5><select id="reviewType"><option value="good">👍 好评</option><option value="bad">👎 差评</option></select><select id="reviewRating"><option value="5">⭐⭐⭐⭐⭐ 5星</option><option value="4">⭐⭐⭐⭐ 4星</option><option value="3">⭐⭐⭐ 3星</option><option value="2">⭐⭐ 2星</option><option value="1">⭐ 1星</option></select><textarea id="reviewContent" placeholder="分享你的阅读感受..." rows="3"></textarea><button onclick="addReview('${book.isbn}', document.getElementById('reviewRating').value, document.getElementById('reviewType').value, document.getElementById('reviewContent').value)">提交评价</button></div><br><button onclick="this.parentElement.parentElement.style.display='none'">关闭</button></div>`;
+        let traceDiv = document.getElementById('globalTraceResult');
+        if (!traceDiv) { traceDiv = document.createElement('div'); traceDiv.id = 'globalTraceResult'; traceDiv.className = 'card'; document.getElementById('dynamicContent').insertBefore(traceDiv, document.getElementById('dynamicContent').firstChild); }
+        traceDiv.innerHTML = html; traceDiv.style.display = 'block'; traceDiv.scrollIntoView({ behavior: 'smooth' });
+    }
 
-        async function updateState(isbn, newState, remark) { const res = await fetch(`${API_BASE}/books/${isbn}/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ newState, remark }) }); const result = await res.json(); alert(result.success ? '✅ 状态更新成功' : '❌ 更新失败: ' + result.error); if (result.success) loadRoleContent(); }
-        async function finishPrint(isbn) { await updateState(isbn, '印刷完成', '印刷厂完成印刷'); await updateState(isbn, '出厂分发', '印刷厂出厂分发'); }
-        async function warehouseAndDistribute(isbn) { await updateState(isbn, '批发商入库', '批发商确认入库'); await updateState(isbn, '配送到门店', '批发商配送到门店'); }
-        async function shelfBook(isbn) { await updateState(isbn, '书店上架', '书店确认上架'); }
-        async function sellBook(isbn) { await updateState(isbn, '已售出', '书店售出'); }
-        async function buyBook(isbn, count) { const res = await fetch(`${API_BASE}/books/${isbn}/buy`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ count: count || 1 }) }); const result = await res.json(); alert(result.success ? `✅ 购买成功！${result.message}` : '❌ ' + result.error); if (result.success) loadRoleContent(); }
-        async function addReview(isbn, rating, reviewType, content) { const res = await fetch(`${API_BASE}/books/${isbn}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ rating, reviewType, content }) }); const result = await res.json(); alert(result.success ? '✅ 评价成功' : '❌ ' + result.error); if (result.success) loadRoleContent(); }
-        async function listSecondHand(isbn, price, condition) { const res = await fetch(`${API_BASE}/secondhand/list`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ isbn, price, condition }) }); const result = await res.json(); alert(result.success ? '✅ 上架成功' : '❌ ' + result.error); if (result.success) loadRoleContent(); }
-        async function buySecondHand(listingId, isbn) { const res = await fetch(`${API_BASE}/secondhand/buy`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ listingId, isbn }) }); const result = await res.json(); alert(result.success ? '✅ 二手书购买成功' : '❌ ' + result.error); if (result.success) loadRoleContent(); }
-        async function verifyAntiCounterfeit(isbn) { const res = await fetch(`${API_BASE}/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isbn, ip: "127.0.0.1", location: "未知", userAgent: navigator.userAgent }) }); const result = await res.json(); alert(result.message); return result; }
-
-        async function traceBook(isbn) {
-            const res = await fetch(`${API_BASE}/books/${isbn}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
-            const book = await res.json();
-            let commentsHtml = '';
-            if (book.comments && book.comments.length) { commentsHtml = `<div><h5>📝 读者评价 (${book.comments.length})</h5>${book.comments.map(c => `<div class="comment-item"><strong>${c.userName}</strong> <span class="rating">${c.type === 'good' ? '👍 好评' : '👎 差评'} ${'⭐'.repeat(c.rating)}</span><span class="comment-time">${c.time}</span><p>${c.content}</p></div>`).join('')}</div>`; }
-            let html = `<div class="trace-flow"><h4>📘 ${book.bookName}</h4><p><strong>ISBN:</strong> ${book.isbn} | <strong>作者:</strong> ${book.author} | <strong>出版社:</strong> ${book.publisher} | <strong>价格:</strong> ¥${book.price}</p><p><strong>库存:</strong> ${book.quantity || 0} 本 | <strong>已售:</strong> ${book.totalSold || 0} 本</p><p><strong>当前状态:</strong> <span class="state-badge">${book.currentState}</span></p><p><strong>🔐 防伪码:</strong> <span class="anti-code">${book.antiCounterfeit?.code || '未生成'}</span> <button class="btn-sm" onclick="verifyAntiCounterfeit('${book.isbn}')">验证真伪</button></p><p><strong>🌍 碳足迹:</strong> ${book.carbonFootprint?.totalEmissions || 0} kg CO₂ (印刷: ${book.carbonFootprint?.printEmissions || 0} kg | 运输: ${book.carbonFootprint?.transportEmissions || 0} kg)</p><h5>📜 流转历史</h5>${book.flowHistory.map(flow => `<div class="flow-item"><strong>${flow.state}</strong> | ${flow.orgName} | ${flow.optTime}<br><small>${flow.remark}</small></div>`).join('')}${commentsHtml}<div class="comment-form"><h5>💬 发表评价</h5><select id="reviewType"><option value="good">👍 好评</option><option value="bad">👎 差评</option></select><select id="reviewRating"><option value="5">⭐⭐⭐⭐⭐ 5星</option><option value="4">⭐⭐⭐⭐ 4星</option><option value="3">⭐⭐⭐ 3星</option><option value="2">⭐⭐ 2星</option><option value="1">⭐ 1星</option></select><textarea id="reviewContent" placeholder="分享你的阅读感受..." rows="3"></textarea><button onclick="addReview('${book.isbn}', document.getElementById('reviewRating').value, document.getElementById('reviewType').value, document.getElementById('reviewContent').value)">提交评价</button></div><br><button onclick="this.parentElement.parentElement.style.display='none'">关闭</button></div>`;
-            let traceDiv = document.getElementById('globalTraceResult');
-            if (!traceDiv) { traceDiv = document.createElement('div'); traceDiv.id = 'globalTraceResult'; traceDiv.className = 'card'; document.getElementById('dynamicContent').insertBefore(traceDiv, document.getElementById('dynamicContent').firstChild); }
-            traceDiv.innerHTML = html; traceDiv.style.display = 'block'; traceDiv.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function renderBookList(books, buttonRenderer, readonly = false) {
-            if (!books || !books.length) return '<p style="text-align:center;padding:20px;color:#999;">暂无数据</p>';
-            allBooksCache = books;
-            const totalPages = Math.ceil(books.length / pageSize);
-            const start = (currentPage - 1) * pageSize;
-            const pageBooks = books.slice(start, start + pageSize);
-            let html = pageBooks.map(book => `<div class="book-card"><div class="book-cover">${getCover(book.isbn) ? `<img src="${getCover(book.isbn)}" style="width:60px;height:80px;object-fit:cover">` : '📖'}</div><div class="book-info"><strong>${book.bookName}</strong><br><small>ISBN: ${book.isbn} | 作者: ${book.author} | 价格: ¥${book.price}</small><br><small>库存: ${book.quantity || 0}本 | 状态: <span class="state-badge">${book.currentState}</span></small><br><small>碳足迹: ${book.carbonFootprint?.totalEmissions || 0} kg CO₂</small></div><div class="book-actions"><button class="btn-sm" onclick="traceBook('${book.isbn}')">🔍 溯源</button><button class="btn-sm" onclick="showQRCode('${book.isbn}', '${book.bookName.replace(/'/g, "\\'")}')">📱 二维码</button>${!readonly && buttonRenderer ? buttonRenderer(book) : ''}</div></div>`).join('');
-            if (totalPages > 1) html += `<div class="pagination"><button onclick="changePage(-1)" ${currentPage === 1 ? 'disabled' : ''}>⬅ 上一页</button><span>第 ${currentPage} / ${totalPages} 页</span><button onclick="changePage(1)" ${currentPage === totalPages ? 'disabled' : ''}>下一页 ➔</button></div>`;
-            return html;
-        }
-
-        const searchHTML = `<div class="search-bar"><input type="text" id="searchKeyword" placeholder="搜索书名/作者/ISBN"><select id="searchStatus"><option value="">全部状态</option><option value="图书信息已录入">图书信息已录入</option><option value="印刷完成">印刷完成</option><option value="出厂分发">出厂分发</option><option value="批发商入库">批发商入库</option><option value="配送到门店">配送到门店</option><option value="书店上架">书店上架</option><option value="已售出">已售出</option></select><button onclick="applyFilter()">🔍 搜索</button><button onclick="resetFilter()">🔄 重置</button></div>`;
-
-        async function loadRoleContent() {
-            const user = JSON.parse(localStorage.getItem('user'));
-            const container = document.getElementById('dynamicContent');
-            let books = await fetchBooks();
-            if (user.role === 'publisher') {
-                let filtered = filterBooks(books);
-                container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>📖 录入新书</h3><div class="form-group"><input type="text" id="isbn" placeholder="ISBN*"><input type="text" id="bookName" placeholder="书名*"><input type="text" id="author" placeholder="作者*"><input type="text" id="publisher" placeholder="出版社*"></div><div class="form-group"><input type="date" id="publishDate"><input type="text" id="category" placeholder="分类"><input type="text" id="price" placeholder="价格"><input type="text" id="quantity" placeholder="库存数量" value="1"></div><div class="form-group"><input type="file" id="coverFile" accept="image/*"><button class="btn-success" onclick="createBook()">📤 提交上链</button></div></div><div class="card"><h3>📚 所有图书 (${filtered.length}本)</h3>${searchHTML}${renderBookList(filtered, null, true)}</div>`;
-            } else if (user.role === 'printer') {
-                const pending = books.filter(b => b.currentState === '图书信息已录入');
-                container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>🖨️ 待印刷 (${pending.length}本)</h3>${renderBookList(pending, (book) => `<button class="btn-sm btn-success" onclick="finishPrint('${book.isbn}')">✅ 印刷并出厂</button>`)}</div>`;
-            } else if (user.role === 'wholesaler') {
-                const toWarehouse = books.filter(b => b.currentState === '出厂分发');
-                const toDistribute = books.filter(b => b.currentState === '批发商入库');
-                container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>📦 待入库 (${toWarehouse.length}本)</h3>${renderBookList(toWarehouse, (book) => `<button class="btn-sm btn-success" onclick="warehouseAndDistribute('${book.isbn}')">📥 入库并配送</button>`)}</div><div class="card"><h3>🚚 待配送 (${toDistribute.length}本)</h3>${renderBookList(toDistribute, (book) => `<button class="btn-sm btn-warning" onclick="updateState('${book.isbn}', '配送到门店', '配送到门店')">🚚 配送至门店</button>`)}</div>`;
-            } else if (user.role === 'bookstore') {
-                const toShelf = books.filter(b => b.currentState === '配送到门店');
-                const onSale = books.filter(b => b.currentState === '书店上架');
-                const sold = books.filter(b => b.currentState === '已售出');
-                container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>🏪 待上架 (${toShelf.length}本)</h3>${renderBookList(toShelf, (book) => `<button class="btn-sm btn-success" onclick="shelfBook('${book.isbn}')">📚 上架</button>`)}</div><div class="card"><h3>💰 在售中 (${onSale.length}本)</h3>${renderBookList(onSale, (book) => `<button class="btn-sm btn-buy" onclick="sellBook('${book.isbn}')">💵 售出</button>`)}</div><div class="card"><h3>✅ 已售出 (${sold.length}本)</h3>${renderBookList(sold, null, true)}</div>`;
-            } else if (user.role === 'regulator') {
-                const stats = await fetchStats();
-                let filtered = filterBooks(books);
-                const stateCount = {}; filtered.forEach(book => { stateCount[book.currentState] = (stateCount[book.currentState] || 0) + 1; });
-                container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>📊 统计数据</h3><div id="statsChart" style="width:100%;height:400px;"></div><pre class="stats">${JSON.stringify(stats, null, 2)}</pre></div><div class="card"><h3>📚 全部图书 (${filtered.length}本)</h3>${searchHTML}${renderBookList(filtered, null, true)}</div>`;
-                setTimeout(() => { const chart = echarts.init(document.getElementById('statsChart')); chart.setOption({ title: { text: '图书状态分布', left: 'center' }, tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: Object.keys(stateCount), axisLabel: { rotate: 30 } }, yAxis: { type: 'value', name: '数量' }, series: [{ type: 'bar', data: Object.values(stateCount), itemStyle: { borderRadius: [5,5,0,0], color: '#3498db' } }] }); }, 100);
-            } else if (user.role === 'user') {
-                let onSale = books.filter(b => b.currentState === '书店上架' && (b.quantity || 0) > 0);
-                if (searchKeyword) onSale = onSale.filter(b => b.bookName.toLowerCase().includes(searchKeyword) || b.author.toLowerCase().includes(searchKeyword) || b.isbn.includes(searchKeyword));
-                const purchases = await fetchMyPurchases();
-                const secondHandListings = await fetchSecondHandListings();
-                container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div>
-                    <div class="card"><h3>🛒 在售图书 (${onSale.length}本)</h3>${searchHTML}${renderBookList(onSale, (book) => `<div style="display:flex; gap:5px; align-items:center;"><input type="number" id="buyCount_${book.isbn}" value="1" min="1" max="${book.quantity}" style="width:60px;"><button class="btn-sm btn-buy" onclick="buyBook('${book.isbn}', document.getElementById('buyCount_${book.isbn}').value)">🛒 购买</button></div>`)}</div>
-                    <div class="card"><h3>🔄 二手书市场</h3>${secondHandListings.length ? secondHandListings.map(l => `<div class="book-card"><div class="book-info"><strong>${l.bookName}</strong><br><small>卖家: ${l.sellerName} | 价格: ¥${l.price} | 品相: ${l.condition}</small></div><button class="btn-sm btn-buy" onclick="buySecondHand('${l.id}', '${l.isbn}')">🛒 购买二手</button></div>`).join('') : '<p>暂无二手书在售</p>'}</div>
-                    <div class="card"><h3>📖 我的书架 (${purchases.length}本)</h3>${purchases.map(p => `<div class="book-card"><div class="book-cover">${getCover(p.isbn) ? `<img src="${getCover(p.isbn)}" style="width:60px;height:80px;object-fit:cover">` : '📖'}</div><div class="book-info"><strong>${p.bookName}</strong><br><small>ISBN: ${p.isbn} | 价格: ¥${p.price}</small><br><small>购买时间: ${new Date(p.buyTime).toLocaleString()}</small></div><button class="btn-sm" onclick="traceBook('${p.isbn}')">🔍 溯源</button><button class="btn-sm btn-warning" onclick="let price=prompt('请输入出售价格:', ${p.price*0.7}); if(price) listSecondHand('${p.isbn}', parseFloat(price), '九成新');">🔄 转售</button></div>`).join('') || '<p style="text-align:center;padding:20px;">暂无购买记录</p>'}</div>`;
+    function renderBookList(books, buttonRenderer, readonly = false) {
+        if (!books || !books.length) return '<p style="text-align:center;padding:20px;color:#999;">暂无数据</p>';
+        allBooksCache = books;
+        const totalPages = Math.ceil(books.length / pageSize);
+        const start = (currentPage - 1) * pageSize;
+        const pageBooks = books.slice(start, start + pageSize);
+        let html = pageBooks.map(book => {
+            // 修复：碳足迹只显示非零值
+            let carbonText = `${book.carbonFootprint?.totalEmissions || 0} kg CO₂`;
+            if (book.carbonFootprint?.printEmissions) {
+                carbonText += ` (印:${book.carbonFootprint.printEmissions}kg)`;
             }
-        }
+            if (book.carbonFootprint?.transportEmissions && book.carbonFootprint.transportEmissions > 0) {
+                carbonText += ` 运:${book.carbonFootprint.transportEmissions}kg`;
+            }
+            return `<div class="book-card"><div class="book-cover">${getCover(book.isbn) ? `<img src="${getCover(book.isbn)}" style="width:60px;height:80px;object-fit:cover">` : '📖'}</div><div class="book-info"><strong>${book.bookName}</strong><br><small>ISBN: ${book.isbn} | 作者: ${book.author} | 价格: ¥${book.price}</small><br><small>库存: ${book.quantity || 0}本 | 状态: <span class="state-badge">${book.currentState}</span></small><br><small>碳足迹: ${carbonText}</small></div><div class="book-actions"><button class="btn-sm" onclick="traceBook('${book.isbn}')">🔍 溯源</button><button class="btn-sm" onclick="showQRCode('${book.isbn}', '${book.bookName.replace(/'/g, "\\'")}')">📱 二维码</button>${!readonly && buttonRenderer ? buttonRenderer(book) : ''}</div></div>`;
+        }).join('');
+        if (totalPages > 1) html += `<div class="pagination"><button onclick="changePage(-1)" ${currentPage === 1 ? 'disabled' : ''}>⬅ 上一页</button><span>第 ${currentPage} / ${totalPages} 页</span><button onclick="changePage(1)" ${currentPage === totalPages ? 'disabled' : ''}>下一页 ➔</button></div>`;
+        return html;
+    }
 
-        updateUsername();
-        if (localStorage.getItem('token')) {
-            document.getElementById('loginPage').style.display = 'none';
-            document.getElementById('app').style.display = 'block';
-            const user = JSON.parse(localStorage.getItem('user'));
-            document.getElementById('userName').innerText = user.name;
-            document.getElementById('userRole').innerText = user.roleName;
-            loadRoleContent();
+    const searchHTML = `<div class="search-bar"><input type="text" id="searchKeyword" placeholder="搜索书名/作者/ISBN"><select id="searchStatus"><option value="">全部状态</option><option value="图书信息已录入">图书信息已录入</option><option value="印刷完成">印刷完成</option><option value="出厂分发">出厂分发</option><option value="批发商入库">批发商入库</option><option value="配送到门店">配送到门店</option><option value="书店上架">书店上架</option><option value="已售出">已售出</option></select><button onclick="applyFilter()">🔍 搜索</button><button onclick="resetFilter()">🔄 重置</button></div>`;
+
+    async function loadRoleContent() {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const container = document.getElementById('dynamicContent');
+        let books = await fetchBooks();
+        if (user.role === 'publisher') {
+            let filtered = filterBooks(books);
+            container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>📖 录入新书</h3><div class="form-group"><input type="text" id="isbn" placeholder="ISBN*"><input type="text" id="bookName" placeholder="书名*"><input type="text" id="author" placeholder="作者*"><input type="text" id="publisher" placeholder="出版社*"></div><div class="form-group"><input type="date" id="publishDate"><input type="text" id="category" placeholder="分类"><input type="text" id="price" placeholder="价格"><input type="text" id="quantity" placeholder="库存数量" value="1"></div><div class="form-group"><select id="paperType"><option value="普通纸">普通纸</option><option value="再生纸">再生纸</option><option value="环保纸">环保纸</option><option value="铜版纸">铜版纸</option></select><input type="text" id="printEnergy" placeholder="印刷能耗(kWh)" value="100"><input type="file" id="coverFile" accept="image/*"><button class="btn-success" onclick="createBook()">📤 提交上链</button></div></div><div class="card"><h3>📚 所有图书 (${filtered.length}本)</h3>${searchHTML}${renderBookList(filtered, null, true)}</div>`;
+        } else if (user.role === 'printer') {
+            const pending = books.filter(b => b.currentState === '图书信息已录入');
+            container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>🖨️ 待印刷 (${pending.length}本)</h3>${renderBookList(pending, (book) => `<button class="btn-sm btn-success" onclick="finishPrint('${book.isbn}')">✅ 印刷并出厂</button>`)}</div>`;
+        } else if (user.role === 'wholesaler') {
+            const toWarehouse = books.filter(b => b.currentState === '出厂分发');
+            const toDistribute = books.filter(b => b.currentState === '批发商入库');
+            container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>📦 待入库 (${toWarehouse.length}本)</h3>${renderBookList(toWarehouse, (book) => `<button class="btn-sm btn-success" onclick="warehouseAndDistribute('${book.isbn}')">📥 入库并配送</button>`)}</div><div class="card"><h3>🚚 待配送 (${toDistribute.length}本)</h3>${renderBookList(toDistribute, (book) => `<button class="btn-sm btn-warning" onclick="updateState('${book.isbn}', '配送到门店', '配送到门店')">🚚 配送至门店</button>`)}</div>`;
+        } else if (user.role === 'bookstore') {
+            const toShelf = books.filter(b => b.currentState === '配送到门店');
+            const onSale = books.filter(b => b.currentState === '书店上架' && b.quantity > 0);
+            const sold = books.filter(b => b.currentState === '已售出' || (b.currentState === '书店上架' && b.quantity === 0));
+            container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>🏪 待上架 (${toShelf.length}本)</h3>${renderBookList(toShelf, (book) => `<div style="display:flex; gap:5px; align-items:center;"><input type="number" id="shelfCount_${book.isbn}" value="1" min="1" max="${book.quantity}" style="width:60px;"><button class="btn-sm btn-success" onclick="shelfBookWithCount('${book.isbn}', document.getElementById('shelfCount_${book.isbn}').value)">📚 上架</button></div>`)}</div><div class="card"><h3>💰 在售中 (${onSale.length}本)</h3>${renderBookList(onSale, (book) => `<button class="btn-sm btn-buy" onclick="sellBook('${book.isbn}')">💵 售出</button>`)}</div><div class="card"><h3>✅ 已售罄/已售出 (${sold.length}本)</h3>${renderBookList(sold, null, true)}</div>`;
+        } else if (user.role === 'regulator') {
+            const stats = await fetchStats();
+            let filtered = filterBooks(books);
+            const stateCount = {}; filtered.forEach(book => { stateCount[book.currentState] = (stateCount[book.currentState] || 0) + 1; });
+            container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div><div class="card"><h3>📊 统计数据</h3><div id="statsChart" style="width:100%;height:400px;"></div><pre class="stats">${JSON.stringify(stats, null, 2)}</pre></div><div class="card"><h3>📚 全部图书 (${filtered.length}本)</h3>${searchHTML}${renderBookList(filtered, null, true)}</div>`;
+            setTimeout(() => { const chart = echarts.init(document.getElementById('statsChart')); chart.setOption({ title: { text: '图书状态分布', left: 'center' }, tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: Object.keys(stateCount), axisLabel: { rotate: 30 } }, yAxis: { type: 'value', name: '数量' }, series: [{ type: 'bar', data: Object.values(stateCount), itemStyle: { borderRadius: [5,5,0,0], color: '#3498db' } }] }); }, 100);
+        } else if (user.role === 'user') {
+            let onSale = books.filter(b => b.currentState === '书店上架' && (b.quantity || 0) > 0);
+            if (searchKeyword) onSale = onSale.filter(b => b.bookName.toLowerCase().includes(searchKeyword) || b.author.toLowerCase().includes(searchKeyword) || b.isbn.includes(searchKeyword));
+            const purchases = await fetchMyPurchases();
+            const secondHandListings = await fetchSecondHandListings();
+            container.innerHTML = `<div class="card" id="globalTraceResult" style="display:none;"></div>
+                <div class="card"><h3>🛒 在售图书 (${onSale.length}本)</h3>${searchHTML}${renderBookList(onSale, (book) => `<div style="display:flex; gap:5px; align-items:center;"><input type="number" id="buyCount_${book.isbn}" value="1" min="1" max="${book.quantity}" style="width:60px;"><button class="btn-sm btn-buy" onclick="buyBook('${book.isbn}', document.getElementById('buyCount_${book.isbn}').value)">🛒 购买</button></div>`)}</div>
+                <div class="card"><h3>🔄 二手书市场</h3>${secondHandListings.length ? secondHandListings.map(l => `<div class="book-card"><div class="book-info"><strong>${l.bookName}</strong><br><small>卖家: ${l.sellerName} | 价格: ¥${l.price} | 品相: ${l.condition}</small></div><button class="btn-sm btn-buy" onclick="buySecondHand('${l.id}', '${l.isbn}')">🛒 购买二手</button></div>`).join('') : '<p>暂无二手书在售</p>'}</div>
+                <div class="card"><h3>📖 我的书架 (${purchases.length}本)</h3>${purchases.map(p => `<div class="book-card"><div class="book-cover">${getCover(p.isbn) ? `<img src="${getCover(p.isbn)}" style="width:60px;height:80px;object-fit:cover">` : '📖'}</div><div class="book-info"><strong>${p.bookName}</strong><br><small>ISBN: ${p.isbn} | 价格: ¥${p.price}</small><br><small>购买时间: ${new Date(p.buyTime).toLocaleString()}</small></div><button class="btn-sm" onclick="traceBook('${p.isbn}')">🔍 溯源</button><button class="btn-sm btn-warning" onclick="let price=prompt('请输入出售价格:', ${p.price*0.7}); if(price) listSecondHand('${p.isbn}', parseFloat(price), '九成新');">🔄 转售</button></div>`).join('') || '<p style="text-align:center;padding:20px;">暂无购买记录</p>'}</div>`;
         }
-        window.onclick = function(event) { const modal = document.getElementById('qrModal'); if (event.target === modal) closeQRModal(); const regModal = document.getElementById('registerModal'); if (event.target === regModal) closeRegisterModal(); };
-    </script>
+    }
+
+    updateUsername();
+    if (localStorage.getItem('token')) {
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        const user = JSON.parse(localStorage.getItem('user'));
+        document.getElementById('userName').innerText = user.name;
+        document.getElementById('userRole').innerText = user.roleName;
+        loadRoleContent();
+    }
+    window.onclick = function(event) { const modal = document.getElementById('qrModal'); if (event.target === modal) closeQRModal(); const regModal = document.getElementById('registerModal'); if (event.target === regModal) closeRegisterModal(); };
+</script>
 </body>
 </html>
